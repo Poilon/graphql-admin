@@ -3,13 +3,15 @@ module Main exposing (main, view)
 import Browser exposing (UrlRequest)
 import Browser.Navigation as Navigation
 import Element exposing (..)
+import Element.Border as Border
 import Element.Events exposing (onClick)
-import Html exposing (Html, button, div)
+import Element.Font as Font
+import Html exposing (Html)
 import Http exposing (Error)
-import Json.Decode as D exposing (Decoder)
+import Json.Decode as D
 import Json.Decode.Pipeline exposing (required)
 import Json.Encode as Encode exposing (Value)
-import RemoteData as RemoteData exposing (RemoteData)
+import String.Case as String
 import Url
 
 
@@ -35,11 +37,11 @@ makeRequest =
         , body =
             Http.jsonBody
                 (Encode.object
-                    [ ( "query", graphQlQuery )
+                    [ ( "query", introspectionGraphQlQuery )
                     , ( "variables", graphQlVariables )
                     ]
                 )
-        , expect = Http.expectJson GotResponse dataDecoder
+        , expect = Http.expectJson GotIntrospectionResponse introspectionDataDecoder
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -78,20 +80,20 @@ type alias DataModel =
 
 
 type alias Field =
-    { name : String, kind : Type }
+    { name : String, type_ : Type }
 
 
 type alias Type =
     { name : Maybe String, kind : String }
 
 
-graphQlQuery : Value
-graphQlQuery =
+introspectionGraphQlQuery : Value
+introspectionGraphQlQuery =
     Encode.string "query { __schema { types { name fields { name type { name kind } }}}}"
 
 
-dataDecoder : D.Decoder (List DataModel)
-dataDecoder =
+introspectionDataDecoder : D.Decoder (List DataModel)
+introspectionDataDecoder =
     D.field "data" (D.field "__schema" (D.field "types" (D.list dataModelDecoder)))
 
 
@@ -116,19 +118,11 @@ typeDecoder =
         |> required "kind" D.string
 
 
-value : Value
-value =
-    Encode.object
-        [ ( "query", graphQlQuery )
-        , ( "variables", graphQlVariables )
-        ]
-
-
 type alias Model =
     { count : Int
     , introspectionData : List DataModel
-    , filteredIntrospectionData : List DataModel
-    , typeOpened : Maybe DataModel
+    , filteredIntrospectionData : List ModelTable
+    , typeOpened : Maybe ModelTable
     , error : Maybe String
     }
 
@@ -154,8 +148,9 @@ type Msg
     | Decrement
     | UrlRequested UrlRequest
     | UrlChanged Url.Url
-    | GotResponse (Result Error (List DataModel))
-    | OpenType DataModel
+    | GotIntrospectionResponse (Result Error (List DataModel))
+    | GotDataResponse ModelTable (Result Error (List (List ( String, Maybe String ))))
+    | OpenType ModelTable
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -173,7 +168,7 @@ update msg model =
         UrlChanged _ ->
             Debug.todo "branch 'UrlChanged _' not implemented"
 
-        GotResponse response ->
+        GotIntrospectionResponse response ->
             case response of
                 Ok introspectionData ->
                     let
@@ -192,14 +187,107 @@ update msg model =
                 Err err ->
                     ( { model | error = Just (toString err) }, Cmd.none )
 
-        OpenType dataModel ->
-            ( { model | typeOpened = Just dataModel }, Cmd.none )
+        GotDataResponse modelTable (Ok data) ->
+            let
+                newModelTable =
+                    { modelTable
+                        | data = data
+                    }
+            in
+            ( { model
+                | filteredIntrospectionData = updateModelTable model.filteredIntrospectionData modelTable newModelTable
+                , typeOpened = Just newModelTable
+              }
+            , Cmd.none
+            )
+
+        GotDataResponse _ (Err err) ->
+            ( { model | error = Just (toString err) }, Cmd.none )
+
+        OpenType modelTable ->
+            ( { model | typeOpened = Just modelTable }
+            , fetchData modelTable
+            )
 
 
-getDataModelsWithFields : List DataModel -> List String -> List DataModel
+updateModelTable : List ModelTable -> ModelTable -> ModelTable -> List ModelTable
+updateModelTable modelTables modelTable newModelTable =
+    List.map
+        (\modelTable_ ->
+            if modelTable_.dataModel.name == modelTable.dataModel.name then
+                newModelTable
+
+            else
+                modelTable_
+        )
+        modelTables
+
+
+graphQlDataQuery : ModelTable -> Value
+graphQlDataQuery modelTable =
+    Encode.string
+        ("""query { """
+            ++ "paginated"
+            ++ pluralize modelTable.dataModel.name
+            ++ """(page: """
+            ++ String.fromInt modelTable.page
+            ++ """, perPage: """
+            ++ String.fromInt modelTable.perPage
+            ++ """) { data { """
+            ++ String.join " " (List.map .name <| Maybe.withDefault [] modelTable.dataModel.fields)
+            ++ """ } } }"""
+        )
+
+
+pluralize : String -> String
+pluralize str =
+    if String.endsWith "y" str then
+        String.dropRight 1 str ++ "ies"
+
+    else
+        str ++ "s"
+
+
+fetchData : ModelTable -> Cmd Msg
+fetchData modelTable =
+    Http.request
+        { method = "POST"
+        , headers =
+            [ Http.header "Content-Type" "application/json"
+            ]
+        , url = "http://localhost:3000/graphql"
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "query", graphQlDataQuery modelTable )
+                    , ( "variables", graphQlVariables )
+                    ]
+                )
+        , expect = Http.expectJson (GotDataResponse modelTable) (dataDecoder modelTable.dataModel)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+dataDecoder : DataModel -> D.Decoder (List (List ( String, Maybe String )))
+dataDecoder dataModel =
+    D.field "data"
+        (D.field ("paginated" ++ pluralize dataModel.name)
+            (D.field "data" (D.list (D.keyValuePairs (D.maybe D.string))))
+        )
+
+
+
+-- type alias GraphQLData =
+--     { key : String, value : Maybe String }
+
+
+getDataModelsWithFields : List DataModel -> List String -> List ModelTable
 getDataModelsWithFields introspectionData dataModels =
     introspectionData
         |> List.filter (\data -> List.member data.name dataModels)
+        |> List.map (\data -> { data | fields = data.fields |> Maybe.map (List.filter (\field -> field.type_.kind == "SCALAR")) })
+        |> List.map emptyModelTable
 
 
 toString : Error -> String
@@ -230,47 +318,51 @@ view model =
     }
 
 
-displayDataModel : Maybe DataModel -> Element Msg
-displayDataModel maybeDataModel =
-    case maybeDataModel of
-        Just dataModel ->
+displayDataModel : Maybe ModelTable -> Element Msg
+displayDataModel maybeModelTable =
+    case maybeModelTable of
+        Just modelTable ->
             Element.column
                 [ width fill
                 , height fill
                 , Element.padding 10
                 ]
-                [ Element.text dataModel.name
-                , displayFields dataModel.fields
+                [ displayTable modelTable
                 ]
 
         Nothing ->
             none
 
 
-displayFields : Maybe (List Field) -> Element Msg
-displayFields fields_ =
-    case fields_ of
+displayTable : ModelTable -> Element Msg
+displayTable modelTable =
+    case modelTable.dataModel.fields of
         Just fields ->
-            Element.column
-                [ width fill
-                , height fill
-                , Element.padding 10
-                ]
-                (List.map displayField fields)
+            Element.table [ width fill, height fill ]
+                { data = modelTable.data
+                , columns =
+                    List.map
+                        (\field ->
+                            { header = el [ Border.solid, Border.width 1, Font.center ] <| text field.name
+                            , width = fill
+                            , view = displayData field
+                            }
+                        )
+                        fields
+                }
 
         Nothing ->
-            Element.text "No fields"
+            none
 
 
-displayField : Field -> Element Msg
-displayField field =
-    Element.column
-        [ width fill
-        , height fill
-        , Element.padding 10
-        ]
-        [ Element.text field.name
-        ]
+displayData : Field -> List ( String, Maybe String ) -> Element Msg
+displayData field data =
+    case List.filter (\( key, _ ) -> key == field.name) data of
+        ( _, Just value ) :: _ ->
+            el [ Border.solid, Border.width 1, Font.center ] <| text value
+
+        _ ->
+            el [ Border.solid, Border.width 1, Font.center ] <| text "null"
 
 
 graphQLTable : Model -> Element Msg
@@ -283,7 +375,6 @@ graphQLTable model =
         [ displayError model.error
         , Element.row
             [ width fill
-            , height fill
             , spacing 10
             ]
             (List.map displayFieldName model.filteredIntrospectionData)
@@ -291,17 +382,30 @@ graphQLTable model =
         ]
 
 
-displayFieldName : DataModel -> Element Msg
-displayFieldName dataModel =
+displayFieldName : ModelTable -> Element Msg
+displayFieldName modelTable =
     Element.column
         [ width fill
         , height fill
         , spacing 10
         , pointer
-        , onClick (OpenType dataModel)
+        , onClick (OpenType modelTable)
         ]
-        [ Element.text dataModel.name
+        [ Element.text modelTable.dataModel.name
         ]
+
+
+type alias ModelTable =
+    { page : Int
+    , perPage : Int
+    , dataModel : DataModel
+    , data : List (List ( String, Maybe String ))
+    }
+
+
+emptyModelTable : DataModel -> ModelTable
+emptyModelTable dataModel =
+    { page = 1, perPage = 25, dataModel = dataModel, data = [] }
 
 
 displayError : Maybe String -> Element Msg
@@ -329,9 +433,3 @@ main =
         , onUrlRequest = UrlRequested
         , onUrlChange = UrlChanged
         }
-
-
-
--- PaginatedDataModel
--- DataModel
--- fields qui ont comme type qui ont un kind == SCALAR
