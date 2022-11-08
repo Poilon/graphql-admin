@@ -6,6 +6,7 @@ import Element exposing (..)
 import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
+import Element.Input as Input
 import Html exposing (Html)
 import Http exposing (Error)
 import Json.Decode as D
@@ -47,34 +48,6 @@ makeRequest =
         }
 
 
-
--- graphQlQuery : Value
--- graphQlQuery =
---     Encode.string "query { __schema { types { name } } }"
--- dataDecoder : D.Decoder (List String)
--- dataDecoder =
---     D.field "data" (D.field "__schema" (D.field "types" (D.list (D.field "name" D.string))))
--- example : {
---   "name": "CreateCustomerPayload",
---   "fields": [
---     {
---       "name": "customer",
---       "type": {
---         "name": "Customer",
---         "kind": "OBJECT"
---       }
---     },
---     {
---       "name": "errors",
---       "type": {
---         "name": null,
---         "kind": "LIST"
---       }
---     }
---   ]
--- },
-
-
 type alias DataModel =
     { name : String, fields : Maybe (List Field) }
 
@@ -84,12 +57,16 @@ type alias Field =
 
 
 type alias Type =
+    { name : Maybe String, kind : String, ofType : Maybe OfType }
+
+
+type alias OfType =
     { name : Maybe String, kind : String }
 
 
 introspectionGraphQlQuery : Value
 introspectionGraphQlQuery =
-    Encode.string "query { __schema { types { name fields { name type { name kind } }}}}"
+    Encode.string "query { __schema { types { name fields { name type { name kind ofType { name kind }} }}}}"
 
 
 introspectionDataDecoder : D.Decoder (List DataModel)
@@ -116,6 +93,14 @@ typeDecoder =
     D.succeed Type
         |> required "name" (D.maybe D.string)
         |> required "kind" D.string
+        |> required "ofType" (D.maybe ofTypeDecoder)
+
+
+ofTypeDecoder : D.Decoder OfType
+ofTypeDecoder =
+    D.succeed OfType
+        |> required "name" (D.maybe D.string)
+        |> required "kind" D.string
 
 
 type alias Model =
@@ -124,6 +109,7 @@ type alias Model =
     , filteredIntrospectionData : List ModelTable
     , typeOpened : Maybe ModelTable
     , error : Maybe String
+    , searchInput : String
     }
 
 
@@ -138,6 +124,7 @@ init _ _ _ =
       , filteredIntrospectionData = []
       , typeOpened = Nothing
       , error = Nothing
+      , searchInput = ""
       }
     , makeRequest
     )
@@ -149,8 +136,11 @@ type Msg
     | UrlRequested UrlRequest
     | UrlChanged Url.Url
     | GotIntrospectionResponse (Result Error (List DataModel))
-    | GotDataResponse ModelTable (Result Error (List (List ( String, Maybe String ))))
+    | GotDataResponse ModelTable (Result Error ( Int, List (List ( String, Maybe String )) ))
     | OpenType ModelTable
+    | PreviousPage
+    | NextPage
+    | SearchInputChanged String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -206,7 +196,57 @@ update msg model =
 
         OpenType modelTable ->
             ( { model | typeOpened = Just modelTable }
-            , fetchData modelTable
+            , fetchData Nothing modelTable
+            )
+
+        PreviousPage ->
+            case model.typeOpened of
+                Just modelTable ->
+                    let
+                        newModelTable =
+                            { modelTable
+                                | page = modelTable.page - 1
+                            }
+                    in
+                    ( { model
+                        | typeOpened =
+                            Just newModelTable
+                      }
+                    , fetchData (Just model.searchInput) newModelTable
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        NextPage ->
+            case model.typeOpened of
+                Just modelTable ->
+                    let
+                        newModelTable =
+                            { modelTable
+                                | page = modelTable.page + 1
+                            }
+                    in
+                    ( { model
+                        | typeOpened =
+                            Just newModelTable
+                      }
+                    , fetchData (Just model.searchInput) newModelTable
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        SearchInputChanged newSearchInput ->
+            ( { model
+                | searchInput = newSearchInput
+              }
+            , case model.typeOpened of
+                Just modelTable ->
+                    fetchData (Just newSearchInput) modelTable
+
+                Nothing ->
+                    Cmd.none
             )
 
 
@@ -223,20 +263,55 @@ updateModelTable modelTables modelTable newModelTable =
         modelTables
 
 
-graphQlDataQuery : ModelTable -> Value
-graphQlDataQuery modelTable =
+
+-- modelTable.dataModel.fields.maybe.map { |e| "#{data[e]} == filter" }.join(" && ")
+
+
+{-| Fetch data from the server
+-}
+graphQlDataQuery : Maybe String -> ModelTable -> Value
+graphQlDataQuery maybeFilter modelTable =
     Encode.string
         ("""query { """
             ++ "paginated"
             ++ pluralize modelTable.dataModel.name
-            ++ """(page: """
+            ++ "("
+            ++ (case maybeFilter of
+                    Nothing ->
+                        ""
+
+                    Just "" ->
+                        ""
+
+                    Just filter ->
+                        "filter: "
+                            ++ filtersToGraphQlString filter modelTable.dataModel.fields
+                            ++ ", "
+               )
+            ++ "page: "
             ++ String.fromInt modelTable.page
             ++ """, perPage: """
             ++ String.fromInt modelTable.perPage
-            ++ """) { data { """
+            ++ """) { totalCount data { """
             ++ String.join " " (List.map .name <| Maybe.withDefault [] modelTable.dataModel.fields)
             ++ """ } } }"""
         )
+
+
+filtersToGraphQlString : String -> Maybe (List Field) -> String
+filtersToGraphQlString filter maybeFields =
+    case maybeFields of
+        Just fields ->
+            [ "\""
+            , fields
+                |> List.map (\field -> field.name ++ " % \\\"" ++ filter ++ "\\\"")
+                |> String.join " || "
+            , "\""
+            ]
+                |> String.concat
+
+        Nothing ->
+            ""
 
 
 pluralize : String -> String
@@ -248,8 +323,8 @@ pluralize str =
         str ++ "s"
 
 
-fetchData : ModelTable -> Cmd Msg
-fetchData modelTable =
+fetchData : Maybe String -> ModelTable -> Cmd Msg
+fetchData maybeFilter modelTable =
     Http.request
         { method = "POST"
         , headers =
@@ -259,7 +334,7 @@ fetchData modelTable =
         , body =
             Http.jsonBody
                 (Encode.object
-                    [ ( "query", graphQlDataQuery modelTable )
+                    [ ( "query", graphQlDataQuery maybeFilter modelTable )
                     , ( "variables", graphQlVariables )
                     ]
                 )
@@ -269,24 +344,28 @@ fetchData modelTable =
         }
 
 
-dataDecoder : DataModel -> D.Decoder (List (List ( String, Maybe String )))
+
+-- {"data":{"paginatedCurrencies":{"totalCount":1002,"data":[{"createdAt":"2022-11-03 12:10:40 UTC","id":"d6bfc2b8-bcdb-4096-b29a-871a2a0c5675","isoCode":"USD","name":"USD","updatedAt":"2022-11-03 12:10:40 UTC"},{"createdAt":"2022-11-03 12:10:40 UTC","id":"4c4981b0-79bb-4130-8c21-676a04869f34","isoCode":"EUR","name":"EUR","updatedAt":"2022-11-03 12:10:40 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"d0e9ae53-360f-4124-acdf-14fccc4db0d7","isoCode":"txvexdtsakgwvkredhbhzdohetivcqrxfnzyaypplxcxwyuvtw","name":"jjddccaqaoijikobgywcyflvmkcjhlyzvrxksoenfdzgacfchh","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"941a55f3-ec1e-482f-9fb5-6e53e55f899a","isoCode":"oyyduqvpnreyrummkwvrykvuiwmfblnapmytivmioowpvwtgto","name":"koiifjprlqugrypnevxrdmruelaortjfurmjovuqymuuyvgapm","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f1fc2d45-1aab-457c-8f54-b6ce89013a6b","isoCode":"taeknlmksqmwvrssvfqannqmmwunncfglkouiuncdifpvtyhlc","name":"lndhotzbapwwptgujkvfpsgqyyaezmwtopofoqnranohulkmxv","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c9089015-494c-4fc6-81c0-3b5f57f17f38","isoCode":"fsjpeurimxsmvhakldkaewoqcdmowawhhnuoltdkqkofmbigkt","name":"fjdgoflnfwwdhvgzaxtrnvwijawfhzmpauodnstezjllvdnqyd","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"84ec0180-86c3-4844-a1a6-5bc4970b36e4","isoCode":"dbkctxhwyaroxwoelzsoqocdgnepcylfzyslxgtzecfojoqpdg","name":"purcvxyjzfycmgmsintfmbvdmatnensmdrmusneuwladjaxnzg","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"b7e5c79d-0f29-4d5e-a9f0-4cd9a251bb4a","isoCode":"tmkwfirlwvqyletbibywofofhulzvdzndtuceftjneuufucfey","name":"velimpjjnmxytohcbxvbtaofnbcedmccieuwkgmmfszkucbhwl","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f267ab78-a0bf-4b4f-9257-e4a402bb6766","isoCode":"pyxkwyisjitaifpzzyiuiqbdxztvskgrqovwehcowxoxxjmoka","name":"ludhzvvtlbirjncryyzprjmgtkorosceqecimykrnnqpkyvhls","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"8d2036f9-70e0-4cc4-824a-791a51da1820","isoCode":"hheubuwjkiurjqvwqjfpqzypcpjqzvcswpcnyfvsoewrpfjzfv","name":"akksztownfkqcbczshabsddhgwlxbxntjumdesgavfzmrgjibp","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"a84bb48f-f690-45a5-8b8d-3cf59c6db9ed","isoCode":"aohazmwiqbhcawuylfllfbptmeivueagugwpewxmfiliperehr","name":"cfdloakismbvpljmwaennigmiyuckwfafbcljukkucdtqxpaoq","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"d02f1631-7a42-4924-a65a-f5f0ecf014fb","isoCode":"ipfjvecmxmwilfalpuyxjfeyilksrikinwpwrpbpbslxzxdlwt","name":"sxlischmickzrnupwfewmhagscuyzhygcdeblhdrtaukvorwam","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"6914fd74-fc17-45ac-8b97-c12e1a06ea0b","isoCode":"yawtztpvccqcnzartxppxnvmubfbngryavpyyycctuyvujmswx","name":"exkznpvpypmwwtlyssltcwzxniubpnzjnnrvlygqavdjvghsbr","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"60b8d9b2-1cc7-4570-a110-3ebe7a4d0a15","isoCode":"fruotrvrcbrmqahanjnbqqqsmzlqcduvphhmwruljnwfardxqu","name":"tytaihzeailpcpvupljapershkhrqjdftssbeatgketpvgzvyt","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"6d7fb93d-6cc9-4b73-a10b-abeebf666db9","isoCode":"usonpmprjpneeofvlwzxklosikihnhrwwjyddwowzdfndhtliy","name":"nzcsgisedpaekbmtuwufmwaxizavcdttdpnacttsbeldfnjcpl","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"431f9e74-f0c3-4831-b6d7-f88f347e70c3","isoCode":"ehiapajtvfiwfnecenbsbzdonfcjmouynuvlfaqhhvuztadloh","name":"olsygsfvxpnlctfglnmlvwwtusscactadbeqmasroyypvtgpyz","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c790d743-2fb8-4471-8cea-374a14bd93fb","isoCode":"heobkihscokuawpxapjfmyzvaonvlnwxtdfcifpurmpfhhiuie","name":"ngcjhztmoxbctxidbesbxvxvilhyudsuiuqlzdxxfrkocgrwii","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"5ecd090a-fe6b-4bfd-a3f4-b3ddfd4a7adb","isoCode":"zfglpgneiurrgvhfazozvnsuipysmysvcfffvhoerxzmwovush","name":"aebfkkahcvrmlskxyxlpvmlxilvgpvjjndyadkkzwfjbbhetgj","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"a799aad7-1155-4fb8-b887-e1f03f31b578","isoCode":"nhsyioshglbeyospsklqtannjkxdhpxnptgoydeaqlmhevqavd","name":"ixurninjosuegbqmthbvttqkwrgapbmzxleeeydthlzlkmvbvn","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"15d105df-cacc-4b17-bd38-c7f85f9a507b","isoCode":"sfqjxfgzmdflbyzwdotvonyufblcnadvdmnmhejazqqscogdwd","name":"cjashmeoktfinnnwneoouszxhqjjhbehzzcrrtcefacurvgxiq","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"bae39d4c-911c-43dd-8be1-5a1c81a82fde","isoCode":"yzndqbqrkexkquqiwrtusmqltvqlfwritjkrxfiwhwzbuhxlca","name":"xckagyrlmocyrvzuvsfseawydtqmtvrgegalcgiyxrtcsguszk","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f71a6445-3c83-4ab0-bcd4-1fc4be35cef9","isoCode":"opcejizycbaqoqmosuxraesajujugzgtugfucswldeijlfgtnv","name":"raboosfxvgpnesldngumylsasuwybvjoqygznocehemuboyxvu","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"89d3db2d-12df-4c62-9186-63785db4d740","isoCode":"yfjxbtbjbpmmsjivmkrlyggktsrvxjwgbovgjjvvkrhgzxuzpj","name":"hmhtrwhuqxvdzvgdsmmgsunmgcpsmbeadnieoztbowzupggljn","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c5915dcf-7afa-42ac-b5b8-fbd21639fccf","isoCode":"ikveymzphtasfciyedgppstaqxhouqdohkgnvzivysxvvuytdx","name":"tpprjgtmvmpvjvyotnwqoxfrveudwkbuoaepqzovzgriyfoiax","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"865b9e7d-41ad-4fcf-92ec-c7191c20c858","isoCode":"shtlsvheujbonvqdttfrvhbamqquutfxjfxycjdykktmmlvseq","name":"myaofmysoyqyzjxkmjjjjirzthkdrvcweyquwqdnsfzmiqfwpt","updatedAt":"2022-11-08 08:52:04 UTC"}]}}}
+-- We need to use D.map2
+
+
+dataDecoder : DataModel -> D.Decoder ( Int, List (List ( String, Maybe String )) )
 dataDecoder dataModel =
     D.field "data"
         (D.field ("paginated" ++ pluralize dataModel.name)
-            (D.field "data" (D.list (D.keyValuePairs (D.maybe D.string))))
+            (D.map2
+                (\totalCount data -> ( totalCount, data ))
+                (D.field "totalCount" D.int)
+                (D.field "data" (D.list (D.keyValuePairs (D.maybe D.string))))
+            )
         )
-
-
-
--- type alias GraphQLData =
---     { key : String, value : Maybe String }
 
 
 getDataModelsWithFields : List DataModel -> List String -> List ModelTable
 getDataModelsWithFields introspectionData dataModels =
     introspectionData
         |> List.filter (\data -> List.member data.name dataModels)
-        |> List.map (\data -> { data | fields = data.fields |> Maybe.map (List.filter (\field -> field.type_.kind == "SCALAR")) })
+        |> List.map (\data -> { data | fields = data.fields |> Maybe.map (List.filter (\field -> field.type_.kind == "SCALAR" || Maybe.map .kind field.type_.ofType == Just "SCALAR")) })
         |> List.map emptyModelTable
 
 
@@ -339,7 +418,7 @@ displayTable modelTable =
     case modelTable.dataModel.fields of
         Just fields ->
             Element.table [ width fill, height fill ]
-                { data = modelTable.data
+                { data = Tuple.second modelTable.data
                 , columns =
                     List.map
                         (\field ->
@@ -369,16 +448,73 @@ graphQLTable : Model -> Element Msg
 graphQLTable model =
     Element.column
         [ width fill
-        , height fill
         , spacing 10
         ]
         [ displayError model.error
+        , displaySearchBar model.searchInput
         , Element.row
             [ width fill
             , spacing 10
             ]
             (List.map displayFieldName model.filteredIntrospectionData)
         , displayDataModel model.typeOpened
+        , Maybe.withDefault none <| Maybe.map displayPagination model.typeOpened
+        ]
+
+
+displaySearchBar : String -> Element Msg
+displaySearchBar searchInput =
+    Element.row
+        [ width fill
+        , spacing 10
+        ]
+        [ Input.text
+            [ width fill
+            ]
+            { onChange = SearchInputChanged
+            , text = searchInput
+            , placeholder = Just <| Input.placeholder [] <| text "Search"
+            , label = Input.labelHidden "Search"
+            }
+        ]
+
+
+displayPagination : ModelTable -> Element Msg
+displayPagination { page, perPage, data } =
+    Element.row
+        [ width fill
+        , spacing 10
+        , alignTop
+        ]
+        [ Element.text <| String.fromInt page
+        , Element.text <| String.fromInt perPage
+        , Element.text <| String.fromInt <| (Tuple.first data // perPage) + 1
+
+        --     button :
+        -- List (Attribute msg)
+        -- ->
+        --     { onPress : Maybe msg
+        --     , label : Element msg
+        --     }
+        -- -> Element msg
+        , Input.button []
+            { onPress =
+                if page > 1 then
+                    Just PreviousPage
+
+                else
+                    Nothing
+            , label = text "Previous"
+            }
+        , Input.button []
+            { onPress =
+                if page < (Tuple.first data // perPage) + 1 then
+                    Just NextPage
+
+                else
+                    Nothing
+            , label = text "Next"
+            }
         ]
 
 
@@ -399,13 +535,13 @@ type alias ModelTable =
     { page : Int
     , perPage : Int
     , dataModel : DataModel
-    , data : List (List ( String, Maybe String ))
+    , data : ( Int, List (List ( String, Maybe String )) )
     }
 
 
 emptyModelTable : DataModel -> ModelTable
 emptyModelTable dataModel =
-    { page = 1, perPage = 25, dataModel = dataModel, data = [] }
+    { page = 1, perPage = 25, dataModel = dataModel, data = ( 0, [] ) }
 
 
 displayError : Maybe String -> Element Msg
