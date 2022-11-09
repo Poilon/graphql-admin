@@ -1,16 +1,18 @@
 module Main exposing (main, view)
 
-import Browser exposing (UrlRequest)
+import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
 import Element exposing (..)
 import Element.Border as Border
-import Element.Events exposing (onClick)
+import Element.Events as Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
-import Html exposing (Html)
+import Html exposing (Html, option, select)
+import Html.Attributes
+import Html.Events
 import Http exposing (Error)
 import Json.Decode as D
-import Json.Decode.Pipeline exposing (required)
+import Json.Decode.Pipeline as D exposing (required, requiredAt)
 import Json.Encode as Encode exposing (Value)
 import String.Case as String
 import Url
@@ -49,7 +51,7 @@ makeRequest =
 
 
 type alias DataModel =
-    { name : String, fields : Maybe (List Field) }
+    { name : String, fields : List Field }
 
 
 type alias Field =
@@ -62,6 +64,16 @@ type alias Type =
 
 type alias OfType =
     { name : Maybe String, kind : String }
+
+
+type alias Data =
+    { totalCount : Int
+    , dataList : List DataRow
+    }
+
+
+type alias DataRow =
+    List { key : String, value : Maybe String }
 
 
 introspectionGraphQlQuery : Value
@@ -78,7 +90,7 @@ dataModelDecoder : D.Decoder DataModel
 dataModelDecoder =
     D.succeed DataModel
         |> required "name" D.string
-        |> required "fields" (D.maybe (D.list fieldDecoder))
+        |> D.optional "fields" (D.list fieldDecoder) []
 
 
 fieldDecoder : D.Decoder Field
@@ -136,11 +148,13 @@ type Msg
     | UrlRequested UrlRequest
     | UrlChanged Url.Url
     | GotIntrospectionResponse (Result Error (List DataModel))
-    | GotDataResponse ModelTable (Result Error ( Int, List (List ( String, Maybe String )) ))
+    | GotDataResponse ModelTable (Result Error Data)
     | OpenType ModelTable
     | PreviousPage
     | NextPage
     | SearchInputChanged String
+    | UpdatePerPage String
+    | OrderBy String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -249,6 +263,59 @@ update msg model =
                     Cmd.none
             )
 
+        UpdatePerPage newPerPage ->
+            case model.typeOpened of
+                Just modelTable ->
+                    let
+                        newModelTable =
+                            { modelTable
+                                | perPage = Maybe.withDefault modelTable.perPage <| String.toInt newPerPage
+                            }
+                    in
+                    ( { model
+                        | typeOpened =
+                            Just newModelTable
+                      }
+                    , fetchData (Just model.searchInput) newModelTable
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        OrderBy newOrderBy ->
+            case model.typeOpened of
+                Just modelTable ->
+                    let
+                        oldOrderDirection =
+                            modelTable.orderDirection
+
+                        newOrderDirection =
+                            if modelTable.orderBy == newOrderBy then
+                                if oldOrderDirection == Asc then
+                                    Desc
+
+                                else
+                                    Asc
+
+                            else
+                                Asc
+
+                        newModelTable =
+                            { modelTable
+                                | orderBy = newOrderBy
+                                , orderDirection = newOrderDirection
+                            }
+                    in
+                    ( { model
+                        | typeOpened =
+                            Just newModelTable
+                      }
+                    , fetchData (Just model.searchInput) newModelTable
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
 
 updateModelTable : List ModelTable -> ModelTable -> ModelTable -> List ModelTable
 updateModelTable modelTables modelTable newModelTable =
@@ -290,28 +357,33 @@ graphQlDataQuery maybeFilter modelTable =
                )
             ++ "page: "
             ++ String.fromInt modelTable.page
-            ++ """, perPage: """
+            ++ ", perPage: "
             ++ String.fromInt modelTable.perPage
-            ++ """) { totalCount data { """
-            ++ String.join " " (List.map .name <| Maybe.withDefault [] modelTable.dataModel.fields)
-            ++ """ } } }"""
+            ++ ", orderBy: \""
+            ++ modelTable.orderBy
+            ++ " "
+            ++ orderDirectionToString modelTable.orderDirection
+            ++ "\""
+            ++ ") { totalCount data { "
+            ++ String.join " " (List.map .name modelTable.dataModel.fields)
+            ++ " } } }"
         )
 
 
-filtersToGraphQlString : String -> Maybe (List Field) -> String
-filtersToGraphQlString filter maybeFields =
-    case maybeFields of
-        Just fields ->
+filtersToGraphQlString : String -> List Field -> String
+filtersToGraphQlString filter fields =
+    case fields of
+        [] ->
+            ""
+
+        fields_ ->
             [ "\""
-            , fields
+            , fields_
                 |> List.map (\field -> field.name ++ " % \\\"" ++ filter ++ "\\\"")
                 |> String.join " || "
             , "\""
             ]
                 |> String.concat
-
-        Nothing ->
-            ""
 
 
 pluralize : String -> String
@@ -344,28 +416,23 @@ fetchData maybeFilter modelTable =
         }
 
 
+dataRowDecoder : D.Decoder DataRow
+dataRowDecoder =
+    D.keyValuePairs (D.maybe D.string) |> D.map (List.map (\( key, value ) -> { key = key, value = value }))
 
--- {"data":{"paginatedCurrencies":{"totalCount":1002,"data":[{"createdAt":"2022-11-03 12:10:40 UTC","id":"d6bfc2b8-bcdb-4096-b29a-871a2a0c5675","isoCode":"USD","name":"USD","updatedAt":"2022-11-03 12:10:40 UTC"},{"createdAt":"2022-11-03 12:10:40 UTC","id":"4c4981b0-79bb-4130-8c21-676a04869f34","isoCode":"EUR","name":"EUR","updatedAt":"2022-11-03 12:10:40 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"d0e9ae53-360f-4124-acdf-14fccc4db0d7","isoCode":"txvexdtsakgwvkredhbhzdohetivcqrxfnzyaypplxcxwyuvtw","name":"jjddccaqaoijikobgywcyflvmkcjhlyzvrxksoenfdzgacfchh","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"941a55f3-ec1e-482f-9fb5-6e53e55f899a","isoCode":"oyyduqvpnreyrummkwvrykvuiwmfblnapmytivmioowpvwtgto","name":"koiifjprlqugrypnevxrdmruelaortjfurmjovuqymuuyvgapm","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f1fc2d45-1aab-457c-8f54-b6ce89013a6b","isoCode":"taeknlmksqmwvrssvfqannqmmwunncfglkouiuncdifpvtyhlc","name":"lndhotzbapwwptgujkvfpsgqyyaezmwtopofoqnranohulkmxv","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c9089015-494c-4fc6-81c0-3b5f57f17f38","isoCode":"fsjpeurimxsmvhakldkaewoqcdmowawhhnuoltdkqkofmbigkt","name":"fjdgoflnfwwdhvgzaxtrnvwijawfhzmpauodnstezjllvdnqyd","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"84ec0180-86c3-4844-a1a6-5bc4970b36e4","isoCode":"dbkctxhwyaroxwoelzsoqocdgnepcylfzyslxgtzecfojoqpdg","name":"purcvxyjzfycmgmsintfmbvdmatnensmdrmusneuwladjaxnzg","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"b7e5c79d-0f29-4d5e-a9f0-4cd9a251bb4a","isoCode":"tmkwfirlwvqyletbibywofofhulzvdzndtuceftjneuufucfey","name":"velimpjjnmxytohcbxvbtaofnbcedmccieuwkgmmfszkucbhwl","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f267ab78-a0bf-4b4f-9257-e4a402bb6766","isoCode":"pyxkwyisjitaifpzzyiuiqbdxztvskgrqovwehcowxoxxjmoka","name":"ludhzvvtlbirjncryyzprjmgtkorosceqecimykrnnqpkyvhls","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"8d2036f9-70e0-4cc4-824a-791a51da1820","isoCode":"hheubuwjkiurjqvwqjfpqzypcpjqzvcswpcnyfvsoewrpfjzfv","name":"akksztownfkqcbczshabsddhgwlxbxntjumdesgavfzmrgjibp","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"a84bb48f-f690-45a5-8b8d-3cf59c6db9ed","isoCode":"aohazmwiqbhcawuylfllfbptmeivueagugwpewxmfiliperehr","name":"cfdloakismbvpljmwaennigmiyuckwfafbcljukkucdtqxpaoq","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"d02f1631-7a42-4924-a65a-f5f0ecf014fb","isoCode":"ipfjvecmxmwilfalpuyxjfeyilksrikinwpwrpbpbslxzxdlwt","name":"sxlischmickzrnupwfewmhagscuyzhygcdeblhdrtaukvorwam","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"6914fd74-fc17-45ac-8b97-c12e1a06ea0b","isoCode":"yawtztpvccqcnzartxppxnvmubfbngryavpyyycctuyvujmswx","name":"exkznpvpypmwwtlyssltcwzxniubpnzjnnrvlygqavdjvghsbr","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"60b8d9b2-1cc7-4570-a110-3ebe7a4d0a15","isoCode":"fruotrvrcbrmqahanjnbqqqsmzlqcduvphhmwruljnwfardxqu","name":"tytaihzeailpcpvupljapershkhrqjdftssbeatgketpvgzvyt","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"6d7fb93d-6cc9-4b73-a10b-abeebf666db9","isoCode":"usonpmprjpneeofvlwzxklosikihnhrwwjyddwowzdfndhtliy","name":"nzcsgisedpaekbmtuwufmwaxizavcdttdpnacttsbeldfnjcpl","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"431f9e74-f0c3-4831-b6d7-f88f347e70c3","isoCode":"ehiapajtvfiwfnecenbsbzdonfcjmouynuvlfaqhhvuztadloh","name":"olsygsfvxpnlctfglnmlvwwtusscactadbeqmasroyypvtgpyz","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c790d743-2fb8-4471-8cea-374a14bd93fb","isoCode":"heobkihscokuawpxapjfmyzvaonvlnwxtdfcifpurmpfhhiuie","name":"ngcjhztmoxbctxidbesbxvxvilhyudsuiuqlzdxxfrkocgrwii","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"5ecd090a-fe6b-4bfd-a3f4-b3ddfd4a7adb","isoCode":"zfglpgneiurrgvhfazozvnsuipysmysvcfffvhoerxzmwovush","name":"aebfkkahcvrmlskxyxlpvmlxilvgpvjjndyadkkzwfjbbhetgj","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"a799aad7-1155-4fb8-b887-e1f03f31b578","isoCode":"nhsyioshglbeyospsklqtannjkxdhpxnptgoydeaqlmhevqavd","name":"ixurninjosuegbqmthbvttqkwrgapbmzxleeeydthlzlkmvbvn","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"15d105df-cacc-4b17-bd38-c7f85f9a507b","isoCode":"sfqjxfgzmdflbyzwdotvonyufblcnadvdmnmhejazqqscogdwd","name":"cjashmeoktfinnnwneoouszxhqjjhbehzzcrrtcefacurvgxiq","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"bae39d4c-911c-43dd-8be1-5a1c81a82fde","isoCode":"yzndqbqrkexkquqiwrtusmqltvqlfwritjkrxfiwhwzbuhxlca","name":"xckagyrlmocyrvzuvsfseawydtqmtvrgegalcgiyxrtcsguszk","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"f71a6445-3c83-4ab0-bcd4-1fc4be35cef9","isoCode":"opcejizycbaqoqmosuxraesajujugzgtugfucswldeijlfgtnv","name":"raboosfxvgpnesldngumylsasuwybvjoqygznocehemuboyxvu","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"89d3db2d-12df-4c62-9186-63785db4d740","isoCode":"yfjxbtbjbpmmsjivmkrlyggktsrvxjwgbovgjjvvkrhgzxuzpj","name":"hmhtrwhuqxvdzvgdsmmgsunmgcpsmbeadnieoztbowzupggljn","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"c5915dcf-7afa-42ac-b5b8-fbd21639fccf","isoCode":"ikveymzphtasfciyedgppstaqxhouqdohkgnvzivysxvvuytdx","name":"tpprjgtmvmpvjvyotnwqoxfrveudwkbuoaepqzovzgriyfoiax","updatedAt":"2022-11-08 08:52:04 UTC"},{"createdAt":"2022-11-08 08:52:04 UTC","id":"865b9e7d-41ad-4fcf-92ec-c7191c20c858","isoCode":"shtlsvheujbonvqdttfrvhbamqquutfxjfxycjdykktmmlvseq","name":"myaofmysoyqyzjxkmjjjjirzthkdrvcweyquwqdnsfzmiqfwpt","updatedAt":"2022-11-08 08:52:04 UTC"}]}}}
--- We need to use D.map2
 
-
-dataDecoder : DataModel -> D.Decoder ( Int, List (List ( String, Maybe String )) )
+dataDecoder : DataModel -> D.Decoder Data
 dataDecoder dataModel =
-    D.field "data"
-        (D.field ("paginated" ++ pluralize dataModel.name)
-            (D.map2
-                (\totalCount data -> ( totalCount, data ))
-                (D.field "totalCount" D.int)
-                (D.field "data" (D.list (D.keyValuePairs (D.maybe D.string))))
-            )
-        )
+    D.succeed Data
+        |> requiredAt [ "data", "paginated" ++ pluralize dataModel.name, "totalCount" ] D.int
+        |> requiredAt [ "data", "paginated" ++ pluralize dataModel.name, "data" ] (D.list dataRowDecoder)
 
 
 getDataModelsWithFields : List DataModel -> List String -> List ModelTable
 getDataModelsWithFields introspectionData dataModels =
     introspectionData
         |> List.filter (\data -> List.member data.name dataModels)
-        |> List.map (\data -> { data | fields = data.fields |> Maybe.map (List.filter (\field -> field.type_.kind == "SCALAR" || Maybe.map .kind field.type_.ofType == Just "SCALAR")) })
+        |> List.map (\data -> { data | fields = data.fields |> List.filter (\field -> field.type_.kind == "SCALAR" || Maybe.map .kind field.type_.ofType == Just "SCALAR") })
         |> List.map emptyModelTable
 
 
@@ -388,7 +455,7 @@ toString err =
             "BadBody " ++ response
 
 
-view : Model -> { title : String, body : List (Html Msg) }
+view : Model -> Document Msg
 view model =
     { title = "GRAPHQL ADMIN"
     , body =
@@ -415,33 +482,59 @@ displayDataModel maybeModelTable =
 
 displayTable : ModelTable -> Element Msg
 displayTable modelTable =
-    case modelTable.dataModel.fields of
-        Just fields ->
-            Element.table [ width fill, height fill ]
-                { data = Tuple.second modelTable.data
-                , columns =
-                    List.map
-                        (\field ->
-                            { header = el [ Border.solid, Border.width 1, Font.center ] <| text field.name
-                            , width = fill
-                            , view = displayData field
-                            }
-                        )
-                        fields
-                }
+    Element.table [ width fill, height fill ]
+        { data = modelTable.data.dataList
+        , columns =
+            List.map
+                (\field ->
+                    { header =
+                        row
+                            [ Border.solid
+                            , Border.width 1
+                            , Font.center
+                            , onClick <| OrderBy field.name
+                            , pointer
+                            ]
+                        <|
+                            [ text field.name
+                            , maybeShowCaret modelTable field.name
+                            ]
+                    , width = fill
+                    , view = displayData field
+                    }
+                )
+                modelTable.dataModel.fields
+        }
 
-        Nothing ->
-            none
+
+maybeShowCaret : ModelTable -> String -> Element Msg
+maybeShowCaret modelTable fieldName =
+    if modelTable.orderBy == fieldName then
+        if modelTable.orderDirection == Asc then
+            Element.el [ Font.size 10, alignRight ] <| text "▲"
+
+        else
+            Element.el [ Font.size 10, alignRight ] <| text "▼"
+
+    else
+        none
 
 
-displayData : Field -> List ( String, Maybe String ) -> Element Msg
+displayData : Field -> DataRow -> Element Msg
 displayData field data =
-    case List.filter (\( key, _ ) -> key == field.name) data of
-        ( _, Just value ) :: _ ->
-            el [ Border.solid, Border.width 1, Font.center ] <| text value
+    el [ Border.solid, Border.width 1, Font.center ] <|
+        text <|
+            case data |> List.filter (\d -> d.key == field.name) |> List.head of
+                Just d ->
+                    case d.value of
+                        Just value ->
+                            value
 
-        _ ->
-            el [ Border.solid, Border.width 1, Font.center ] <| text "null"
+                        Nothing ->
+                            "null"
+
+                Nothing ->
+                    "null"
 
 
 graphQLTable : Model -> Element Msg
@@ -479,42 +572,58 @@ displaySearchBar searchInput =
         ]
 
 
+intToOption : Int -> Int -> Html Msg
+intToOption currentPerPage v =
+    option [ Html.Attributes.value (String.fromInt v), Html.Attributes.selected (currentPerPage == v) ] [ Html.text (String.fromInt v) ]
+
+
 displayPagination : ModelTable -> Element Msg
-displayPagination { page, perPage, data } =
-    Element.row
-        [ width fill
-        , spacing 10
-        , alignTop
-        ]
-        [ Element.text <| String.fromInt page
-        , Element.text <| String.fromInt perPage
-        , Element.text <| String.fromInt <| (Tuple.first data // perPage) + 1
+displayPagination ({ page, perPage, data } as modelTable) =
+    Element.column []
+        [ Element.row
+            [ width fill
+            , spacing 10
+            , alignTop
+            ]
+            [ Element.text <| "Page: " ++ String.fromInt page
+            , Element.text <| "Par Page: "
 
-        --     button :
-        -- List (Attribute msg)
-        -- ->
-        --     { onPress : Maybe msg
-        --     , label : Element msg
-        --     }
-        -- -> Element msg
-        , Input.button []
-            { onPress =
-                if page > 1 then
-                    Just PreviousPage
+            -- Select per page
+            , html <|
+                select
+                    [ Html.Events.onInput UpdatePerPage ]
+                    ([ 25, 50, 100 ] |> List.map (intToOption perPage))
+            , Element.text <| " Total pages: " ++ (String.fromInt <| (data.totalCount // perPage) + 1)
 
-                else
-                    Nothing
-            , label = text "Previous"
-            }
-        , Input.button []
-            { onPress =
-                if page < (Tuple.first data // perPage) + 1 then
-                    Just NextPage
+            --     button :
+            -- List (Attribute msg)
+            -- ->
+            --     { onPress : Maybe msg
+            --     , label : Element msg
+            --     }
+            -- -> Element msg
+            ]
+        , Element.row
+            [ width fill, spacing 10 ]
+            [ Input.button []
+                { onPress =
+                    if page > 1 then
+                        Just PreviousPage
 
-                else
-                    Nothing
-            , label = text "Next"
-            }
+                    else
+                        Nothing
+                , label = text "Previous"
+                }
+            , Input.button []
+                { onPress =
+                    if page < (data.totalCount // perPage) + 1 then
+                        Just NextPage
+
+                    else
+                        Nothing
+                , label = text "Next"
+                }
+            ]
         ]
 
 
@@ -534,14 +643,37 @@ displayFieldName modelTable =
 type alias ModelTable =
     { page : Int
     , perPage : Int
+    , orderBy : String
+    , orderDirection : OrderDirection
     , dataModel : DataModel
-    , data : ( Int, List (List ( String, Maybe String )) )
+    , data : Data
     }
+
+
+type OrderDirection
+    = Asc
+    | Desc
+
+
+orderDirectionToString : OrderDirection -> String
+orderDirectionToString orderDirection =
+    case orderDirection of
+        Asc ->
+            "asc"
+
+        Desc ->
+            "desc"
 
 
 emptyModelTable : DataModel -> ModelTable
 emptyModelTable dataModel =
-    { page = 1, perPage = 25, dataModel = dataModel, data = ( 0, [] ) }
+    { page = 1
+    , perPage = 25
+    , orderBy = "createdAt"
+    , orderDirection = Desc
+    , dataModel = dataModel
+    , data = Data 0 []
+    }
 
 
 displayError : Maybe String -> Element Msg
@@ -569,3 +701,388 @@ main =
         , onUrlRequest = UrlRequested
         , onUrlChange = UrlChanged
         }
+
+
+
+-- {
+--   "data": {
+--     "__schema": {
+--       "mutationType": {
+--         "name": "Mutation",
+--         "fields": [
+--           {
+--             "name": "createCustomer",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "CustomerInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createFolder",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "FolderInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createMission",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "MissionInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createTask",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "TaskInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createUser",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "UserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createWorkspace",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceUserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyCustomer",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyFolder",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyMission",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyTask",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyWorkspace",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateCustomer",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "CustomerInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateFolder",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "FolderInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateMission",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "MissionInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateTask",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "TaskInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "UserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateWorkspace",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceUserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           }
+--         ]
+--       }
+--     }
+--   }
+-- }
