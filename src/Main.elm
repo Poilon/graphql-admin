@@ -20,7 +20,7 @@ import Url
 
 graphQlVariables : Value
 graphQlVariables =
-    Encode.object [ ( "loggedUserId", Encode.string "0beff0c8-37ee-4650-aca2-65498c7f522a" ) ]
+    Encode.object [ ( "loggedUserId", Encode.string "ed1997c7-01d5-4418-a1d3-72660c0e33d5" ) ]
 
 
 makeRequest : Cmd Msg
@@ -495,10 +495,6 @@ type alias OfType =
 
 
 type alias Mutation =
-    { name : String, fields : List MutationField }
-
-
-type alias MutationField =
     { name : String, args : List MutationArgument }
 
 
@@ -520,32 +516,30 @@ type alias DataModelWithMutations =
     { name : String, fields : List Field, mutations : List Mutation }
 
 
-fillDataModelsWithMutations : List DataModel -> List Mutation -> List DataModelWithMutations
-fillDataModelsWithMutations dataModels mutations =
-    List.map
-        (\dataModel ->
-            { name = dataModel.name
-            , fields = dataModel.fields
-            , mutations = List.filter (\mutation -> String.endsWith dataModel.name mutation.name) mutations
-            }
-        )
-        dataModels
-
 fillModelTablesWithMutations : List ModelTable -> List Mutation -> List ModelTable
 fillModelTablesWithMutations modelTables mutations =
     List.map
         (\modelTable ->
-            { name = modelTable.name
-            , fields = modelTable.fields
-            , mutations = List.filter (\mutation -> String.endsWith modelTable.name mutation.name) mutations
+            let
+                dataModelWithMutations =
+                    modelTable.dataModelWithMutations
+            in
+            { modelTable
+                | dataModelWithMutations =
+                    { dataModelWithMutations
+                        | mutations =
+                            List.filter (\mutation -> mutation.name |> String.endsWith modelTable.dataModelWithMutations.name) mutations
+                    }
             }
         )
         modelTables
+
+
 introspectionDataDecoder : D.Decoder IntrospectionData
 introspectionDataDecoder =
     D.succeed IntrospectionData
         |> requiredAt [ "data", "__schema", "types" ] (D.list dataModelDecoder)
-        |> requiredAt [ "data", "__schema", "mutationType" ] (D.list mutationDecoder)
+        |> requiredAt [ "data", "__schema", "mutationType", "fields" ] (D.list mutationDecoder)
 
 
 dataModelDecoder : D.Decoder DataModel
@@ -580,13 +574,6 @@ ofTypeDecoder =
 mutationDecoder : D.Decoder Mutation
 mutationDecoder =
     D.succeed Mutation
-        |> required "name" D.string
-        |> required "fields" (D.list mutationFieldDecoder)
-
-
-mutationFieldDecoder : D.Decoder MutationField
-mutationFieldDecoder =
-    D.succeed MutationField
         |> required "name" D.string
         |> required "args" (D.list mutationArgumentDecoder)
 
@@ -666,7 +653,7 @@ update msg model =
                     in
                     ( { model
                         | introspectionData = introspectionData
-                        , filteredIntrospectionData = getDataModelsWithFields introspectionData.types newDataModels 
+                        , filteredIntrospectionData = fillModelTablesWithMutations (getDataModelsWithFields introspectionData.types newDataModels) introspectionData.mutationType
                       }
                     , Cmd.none
                     )
