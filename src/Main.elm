@@ -14,23 +14,17 @@ import Http exposing (Error)
 import Json.Decode as D
 import Json.Decode.Pipeline as D exposing (required, requiredAt)
 import Json.Encode as Encode exposing (Value)
-import String.Case as String
+import String.Case as String exposing (toCamelCaseLower)
 import Url
 
 
 graphQlVariables : Value
 graphQlVariables =
-    Encode.object [ ( "loggedUserId", Encode.string "ed1997c7-01d5-4418-a1d3-72660c0e33d5" ) ]
+    Encode.object [ ( "loggedUserId", Encode.string "854b1efb-faaf-47ca-9abf-b1563eec71d3" ) ]
 
 
 makeRequest : Cmd Msg
 makeRequest =
-    -- Http.post
-    --     { url = "http://localhost:3000/graphql"
-    --     , body =
-    --         Http.stringBody "application/json" "test"
-    --     , expect = Http.expectString GotResponse
-    --     }
     Http.request
         { method = "POST"
         , headers =
@@ -48,391 +42,6 @@ makeRequest =
         , timeout = Nothing
         , tracker = Nothing
         }
-
-
-
--- {
---   "data": {
---     "__schema": {
---       "mutationType": {
---         "name": "Mutation",
---         "fields": [
---           {
---             "name": "createCustomer",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "CustomerInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createFolder",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "FolderInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createMission",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "MissionInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createTask",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "TaskInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createUser",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "UserInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createWorkspace",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "WorkspaceInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "createWorkspaceUser",
---             "args": [
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "WorkspaceUserInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyCustomer",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyFolder",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyMission",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyTask",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyUser",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyWorkspace",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "destroyWorkspaceUser",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateCustomer",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "CustomerInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateFolder",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "FolderInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateMission",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "MissionInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateTask",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "TaskInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateUser",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "UserInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateWorkspace",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "WorkspaceInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           },
---           {
---             "name": "updateWorkspaceUser",
---             "args": [
---               {
---                 "name": "id",
---                 "type": {
---                   "name": null,
---                   "kind": "NON_NULL",
---                   "ofType": {
---                     "name": "String",
---                     "kind": "SCALAR"
---                   }
---                 }
---               },
---               {
---                 "name": "attributes",
---                 "type": {
---                   "name": "WorkspaceUserInputType",
---                   "kind": "INPUT_OBJECT",
---                   "ofType": null
---                 }
---               }
---             ]
---           }
---         ]
---       }
---     }
---   }
--- }
 
 
 introspectionGraphQlQuery : Value
@@ -509,7 +118,7 @@ type alias Data =
 
 
 type alias DataRow =
-    List { key : String, value : Maybe String }
+    { row : List { key : String, value : Maybe String } }
 
 
 type alias DataModelWithMutations =
@@ -625,6 +234,17 @@ type Msg
     | SearchInputChanged String
     | UpdatePerPage String
     | OrderBy String
+    | Destroy Mutation Id DataModelWithMutations
+    | GotMutationResponse Id (Result Error DataRow)
+
+
+type Id
+    = Id String
+
+
+idToString : Id -> String
+idToString (Id id) =
+    id
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -786,6 +406,128 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        Destroy mutation id dataName ->
+            ( model, destroy mutation id dataName )
+
+        GotMutationResponse id (Ok _) ->
+            ( model
+            , case model.typeOpened of
+                Just modelTable ->
+                    fetchData (Just model.searchInput) modelTable
+
+                Nothing ->
+                    Cmd.none
+            )
+
+        GotMutationResponse id (Err err) ->
+            ( { model | error = Just (toString err) }, Cmd.none )
+
+
+
+-- type alias Mutation =
+--     { name : String, args : List MutationArgument }
+-- type alias Type =
+--     { name : Maybe String, kind : String, ofType : Maybe OfType }
+-- type alias OfType =
+--     { name : Maybe String, kind : String }
+-- {
+--     "name": "destroyWorkspace", -- here Workspace is the name of the model
+--     "args": [
+--         {
+--         "name": "id",
+--         "type": {
+--             "name": null,
+--             "kind": "NON_NULL",
+--             "ofType": {
+--             "name": "String",
+--             "kind": "SCALAR"
+--             }
+--         }
+--         }
+--     ]
+-- },
+-- here, we know that the mutation is a destroy mutation and that it takes only one argument, the id of the model to destroy
+
+
+encodeFields : List Field -> String
+encodeFields fields =
+    fields
+        |> List.map .name
+        |> String.join " "
+
+
+destroy : Mutation -> Id -> DataModelWithMutations -> Cmd Msg
+destroy mutation id dataModel =
+    case List.head mutation.args of
+        Just mutationArgument ->
+            if mutationArgument.name == "id" && mutationArgument.type_.kind == "NON_NULL" then
+                Http.request
+                    { method = "POST"
+                    , headers =
+                        [ Http.header "Content-Type" "application/json"
+                        ]
+                    , url = "http://localhost:3000/graphql"
+                    , body =
+                        Http.jsonBody
+                            (Encode.object
+                                [ ( "query"
+                                  , Encode.string
+                                        ("mutation { "
+                                            ++ mutation.name
+                                            ++ "(id: \""
+                                            ++ idToString id
+                                            ++ "\") { "
+                                            ++ String.toCamelCaseLower dataModel.name
+                                            ++ " { "
+                                            ++ encodeFields dataModel.fields
+                                            ++ " } } }"
+                                        )
+                                  )
+                                , ( "variables", graphQlVariables )
+                                ]
+                            )
+                    , expect = Http.expectJson (GotMutationResponse id) (dataModelFromMutationDecoder mutation dataModel.name)
+                    , timeout = Nothing
+                    , tracker = Nothing
+                    }
+
+            else
+                Debug.todo "mutation argument is not an id"
+
+        Nothing ->
+            Debug.todo "mutation has no argument"
+
+
+
+-- type alias DataRow =
+--     List { key : String, value : Maybe String }
+--
+--
+--
+-- {
+--         "data": {
+--             "destroyFolder": {
+--                 "folder": {
+--                     "createdAt": "2022-11-09 17:24:33 UTC",
+--                     "customerId": "3cca2b6c-d6c7-4da0-9182-5f780d0be7f7",
+--                     "endDate": "2022-12-28 00:00:00 UTC",
+--                     "id": "805da441-672b-4f41-aca3-8425def365ec",
+--                     "name": "123",
+--                     "startDate": "2022-11-23 00:00:00 UTC",
+--                     "updatedAt": "2022-11-09 17:24:33 UTC",
+--                     "userId": "854b1efb-faaf-47ca-9abf-b1563eec71d3",
+--                     "workspaceId": "a03dcef1-1364-413e-bba9-f6e4d6c147e7"
+--                 }
+--             }
+--         }
+--     }
+
+
+dataModelFromMutationDecoder : Mutation -> String -> D.Decoder DataRow
+dataModelFromMutationDecoder mutation dataName =
+    D.succeed DataRow
+        |> D.requiredAt [ "data", toCamelCaseLower mutation.name, toCamelCaseLower dataName ] instanceDecoder
+
 
 updateModelTable : List ModelTable -> ModelTable -> ModelTable -> List ModelTable
 updateModelTable modelTables modelTable newModelTable =
@@ -880,9 +622,15 @@ fetchData maybeFilter modelTable =
         }
 
 
+instanceDecoder : D.Decoder (List { key : String, value : Maybe String })
+instanceDecoder =
+    D.keyValuePairs (D.maybe D.string)
+        |> D.map (List.map (\( key, value ) -> { key = key, value = value }))
+
+
 dataRowDecoder : D.Decoder DataRow
 dataRowDecoder =
-    D.keyValuePairs (D.maybe D.string) |> D.map (List.map (\( key, value ) -> { key = key, value = value }))
+    instanceDecoder |> D.map DataRow
 
 
 dataDecoder : DataModelWithMutations -> D.Decoder Data
@@ -944,31 +692,98 @@ displayDataModel maybeModelTable =
             none
 
 
+type FieldOrMutation
+    = DataField Field
+    | MutationField Mutation
+
+
+
+-- I don't like FieldOrMutation, but I don't know how to name it better, maybe
+
+
 displayTable : ModelTable -> Element Msg
 displayTable modelTable =
+    let
+        fields =
+            List.map DataField modelTable.dataModelWithMutations.fields
+
+        mutationsWithoutCreateAndUpdate =
+            modelTable.dataModelWithMutations.mutations
+                |> List.filter (\mutation -> mutation.name /= "create" ++ modelTable.dataModelWithMutations.name && mutation.name /= "update" ++ modelTable.dataModelWithMutations.name)
+                |> List.map MutationField
+    in
     Element.table [ width fill, height fill ]
         { data = modelTable.data.dataList
         , columns =
             List.map
-                (\field ->
-                    { header =
-                        row
-                            [ Border.solid
-                            , Border.width 1
-                            , Font.center
-                            , onClick <| OrderBy field.name
-                            , pointer
-                            ]
-                        <|
-                            [ text field.name
-                            , maybeShowCaret modelTable field.name
-                            ]
-                    , width = fill
-                    , view = displayData field
-                    }
+                (\fieldOrMutation ->
+                    case fieldOrMutation of
+                        DataField field ->
+                            { header =
+                                row
+                                    [ Border.solid
+                                    , Border.width 1
+                                    , Font.center
+                                    , onClick <| OrderBy field.name
+                                    , pointer
+                                    ]
+                                <|
+                                    [ text field.name
+                                    , maybeShowCaret modelTable field.name
+                                    ]
+                            , width = fill
+                            , view = displayData field
+                            }
+
+                        MutationField mutation ->
+                            { header =
+                                row
+                                    [ Border.solid
+                                    , Border.width 1
+                                    , Font.center
+                                    ]
+                                <|
+                                    [ text mutation.name
+                                    ]
+                            , width = fill
+                            , view = displayMutation modelTable.dataModelWithMutations mutation
+                            }
                 )
-                modelTable.dataModelWithMutations.fields
+                (fields ++ mutationsWithoutCreateAndUpdate)
         }
+
+
+removeRightPartOfString : String -> String -> String
+removeRightPartOfString strToRemove str =
+    String.dropRight (String.length strToRemove) str
+
+
+displayMutation : DataModelWithMutations -> Mutation -> DataRow -> Element Msg
+displayMutation dataModel mutation dataRow =
+    let
+        id =
+            dataRow.row
+                |> List.filter (\field -> field.key == "id")
+                |> List.head
+                |> Maybe.map .value
+                |> Maybe.withDefault Nothing
+                |> Maybe.map Id
+    in
+    case removeRightPartOfString dataModel.name mutation.name of
+        "destroy" ->
+            case id of
+                Just id_ ->
+                    Input.button
+                        []
+                        { label = text mutation.name
+                        , onPress = Just <| Destroy mutation id_ dataModel
+                        }
+
+                Nothing ->
+                    none
+
+        _ ->
+            none
 
 
 maybeShowCaret : ModelTable -> String -> Element Msg
@@ -988,7 +803,7 @@ displayData : Field -> DataRow -> Element Msg
 displayData field data =
     el [ Border.solid, Border.width 1, Font.center ] <|
         text <|
-            case data |> List.filter (\d -> d.key == field.name) |> List.head of
+            case data.row |> List.filter (\d -> d.key == field.name) |> List.head of
                 Just d ->
                     case d.value of
                         Just value ->
@@ -1038,7 +853,11 @@ displaySearchBar searchInput =
 
 intToOption : Int -> Int -> Html Msg
 intToOption currentPerPage v =
-    option [ Html.Attributes.value (String.fromInt v), Html.Attributes.selected (currentPerPage == v) ] [ Html.text (String.fromInt v) ]
+    option
+        [ Html.Attributes.value (String.fromInt v)
+        , Html.Attributes.selected (currentPerPage == v)
+        ]
+        [ Html.text (String.fromInt v) ]
 
 
 displayPagination : ModelTable -> Element Msg
