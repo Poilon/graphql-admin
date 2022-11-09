@@ -4,7 +4,7 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
 import Element exposing (..)
 import Element.Border as Border
-import Element.Events as Events exposing (onClick)
+import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html, option, select)
@@ -932,7 +932,7 @@ displayDataModel : Maybe ModelTable -> Element Msg
 displayDataModel maybeModelTable =
     case maybeModelTable of
         Just modelTable ->
-            Element.column
+            column
                 [ width fill
                 , height fill
                 , Element.padding 10
@@ -1003,13 +1003,13 @@ displayData field data =
 
 graphQLTable : Model -> Element Msg
 graphQLTable model =
-    Element.column
+    column
         [ width fill
         , spacing 10
         ]
         [ displayError model.error
         , displaySearchBar model.searchInput
-        , Element.row
+        , row
             [ width fill
             , spacing 10
             ]
@@ -1021,7 +1021,7 @@ graphQLTable model =
 
 displaySearchBar : String -> Element Msg
 displaySearchBar searchInput =
-    Element.row
+    row
         [ width fill
         , spacing 10
         ]
@@ -1042,32 +1042,22 @@ intToOption currentPerPage v =
 
 
 displayPagination : ModelTable -> Element Msg
-displayPagination ({ page, perPage, data } as modelTable) =
-    Element.column []
-        [ Element.row
+displayPagination { page, perPage, data } =
+    column []
+        [ row
             [ width fill
             , spacing 10
             , alignTop
             ]
-            [ Element.text <| "Page: " ++ String.fromInt page
-            , Element.text <| "Par Page: "
-
-            -- Select per page
+            [ text <| "Page: " ++ String.fromInt page
+            , text <| "Par Page: "
             , html <|
                 select
                     [ Html.Events.onInput UpdatePerPage ]
                     ([ 25, 50, 100 ] |> List.map (intToOption perPage))
-            , Element.text <| " Total pages: " ++ (String.fromInt <| (data.totalCount // perPage) + 1)
-
-            --     button :
-            -- List (Attribute msg)
-            -- ->
-            --     { onPress : Maybe msg
-            --     , label : Element msg
-            --     }
-            -- -> Element msg
+            , text <| " Total pages: " ++ (String.fromInt <| (data.totalCount // perPage) + 1)
             ]
-        , Element.row
+        , row
             [ width fill, spacing 10 ]
             [ Input.button []
                 { onPress =
@@ -1093,14 +1083,14 @@ displayPagination ({ page, perPage, data } as modelTable) =
 
 displayFieldName : ModelTable -> Element Msg
 displayFieldName modelTable =
-    Element.column
+    column
         [ width fill
         , height fill
         , spacing 10
         , pointer
         , onClick (OpenType modelTable)
         ]
-        [ Element.text modelTable.dataModelWithMutations.name
+        [ text modelTable.dataModelWithMutations.name
         ]
 
 
