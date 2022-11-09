@@ -50,6 +50,46 @@ makeRequest =
         }
 
 
+introspectionGraphQlQuery : Value
+introspectionGraphQlQuery =
+    Encode.string """query {
+    __schema {
+        types {
+            name
+            fields {
+                name
+                type {
+                    name
+                    kind
+                    ofType {
+                        name
+                        kind
+                    }
+                }
+            }
+        }
+        mutationType {
+            name
+            fields {
+                name
+                type {
+                    name
+                    kind
+                    ofType {
+                        name
+                        kind
+                    }
+                }
+            }
+        }
+    }
+}"""
+
+
+type alias IntrospectionData =
+    { types : List DataModel, mutationType : List DataModel }
+
+
 type alias DataModel =
     { name : String, fields : List Field }
 
@@ -76,14 +116,11 @@ type alias DataRow =
     List { key : String, value : Maybe String }
 
 
-introspectionGraphQlQuery : Value
-introspectionGraphQlQuery =
-    Encode.string "query { __schema { types { name fields { name type { name kind ofType { name kind }} }}}}"
-
-
-introspectionDataDecoder : D.Decoder (List DataModel)
+introspectionDataDecoder : D.Decoder IntrospectionData
 introspectionDataDecoder =
-    D.field "data" (D.field "__schema" (D.field "types" (D.list dataModelDecoder)))
+    D.succeed IntrospectionData
+        |> requiredAt [ "data", "__schema", "types" ] (D.list dataModelDecoder)
+        |> requiredAt [ "data", "__schema", "mutationType" ] (D.list dataModelDecoder)
 
 
 dataModelDecoder : D.Decoder DataModel
@@ -117,7 +154,7 @@ ofTypeDecoder =
 
 type alias Model =
     { count : Int
-    , introspectionData : List DataModel
+    , introspectionData : IntrospectionData
     , filteredIntrospectionData : List ModelTable
     , typeOpened : Maybe ModelTable
     , error : Maybe String
@@ -132,7 +169,7 @@ type alias Flags =
 init : Flags -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ _ _ =
     ( { count = 0
-      , introspectionData = []
+      , introspectionData = IntrospectionData [] []
       , filteredIntrospectionData = []
       , typeOpened = Nothing
       , error = Nothing
@@ -147,7 +184,7 @@ type Msg
     | Decrement
     | UrlRequested UrlRequest
     | UrlChanged Url.Url
-    | GotIntrospectionResponse (Result Error (List DataModel))
+    | GotIntrospectionResponse (Result Error IntrospectionData)
     | GotDataResponse ModelTable (Result Error Data)
     | OpenType ModelTable
     | PreviousPage
@@ -177,13 +214,13 @@ update msg model =
                 Ok introspectionData ->
                     let
                         newDataModels =
-                            introspectionData
+                            introspectionData.types
                                 |> List.filter (\data -> String.startsWith "Paginated" data.name)
                                 |> List.map (\data -> String.dropLeft 9 data.name)
                     in
                     ( { model
                         | introspectionData = introspectionData
-                        , filteredIntrospectionData = getDataModelsWithFields introspectionData newDataModels
+                        , filteredIntrospectionData = getDataModelsWithFields introspectionData.types newDataModels
                       }
                     , Cmd.none
                     )
