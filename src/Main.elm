@@ -50,6 +50,391 @@ makeRequest =
         }
 
 
+
+-- {
+--   "data": {
+--     "__schema": {
+--       "mutationType": {
+--         "name": "Mutation",
+--         "fields": [
+--           {
+--             "name": "createCustomer",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "CustomerInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createFolder",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "FolderInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createMission",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "MissionInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createTask",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "TaskInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createUser",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "UserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createWorkspace",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "createWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceUserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyCustomer",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyFolder",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyMission",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyTask",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyWorkspace",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "destroyWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateCustomer",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "CustomerInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateFolder",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "FolderInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateMission",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "MissionInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateTask",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "TaskInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "UserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateWorkspace",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           },
+--           {
+--             "name": "updateWorkspaceUser",
+--             "args": [
+--               {
+--                 "name": "id",
+--                 "type": {
+--                   "name": null,
+--                   "kind": "NON_NULL",
+--                   "ofType": {
+--                     "name": "String",
+--                     "kind": "SCALAR"
+--                   }
+--                 }
+--               },
+--               {
+--                 "name": "attributes",
+--                 "type": {
+--                   "name": "WorkspaceUserInputType",
+--                   "kind": "INPUT_OBJECT",
+--                   "ofType": null
+--                 }
+--               }
+--             ]
+--           }
+--         ]
+--       }
+--     }
+--   }
+-- }
+
+
 introspectionGraphQlQuery : Value
 introspectionGraphQlQuery =
     Encode.string """query {
@@ -72,12 +457,15 @@ introspectionGraphQlQuery =
             name
             fields {
                 name
-                type {
+                args {
                     name
-                    kind
-                    ofType {
+                    type {
                         name
                         kind
+                        ofType {
+                            name
+                            kind
+                        }
                     }
                 }
             }
@@ -87,7 +475,7 @@ introspectionGraphQlQuery =
 
 
 type alias IntrospectionData =
-    { types : List DataModel, mutationType : List DataModel }
+    { types : List DataModel, mutationType : List Mutation }
 
 
 type alias DataModel =
@@ -106,6 +494,18 @@ type alias OfType =
     { name : Maybe String, kind : String }
 
 
+type alias Mutation =
+    { name : String, fields : List MutationField }
+
+
+type alias MutationField =
+    { name : String, args : List MutationArgument }
+
+
+type alias MutationArgument =
+    { name : String, type_ : Type }
+
+
 type alias Data =
     { totalCount : Int
     , dataList : List DataRow
@@ -116,11 +516,36 @@ type alias DataRow =
     List { key : String, value : Maybe String }
 
 
+type alias DataModelWithMutations =
+    { name : String, fields : List Field, mutations : List Mutation }
+
+
+fillDataModelsWithMutations : List DataModel -> List Mutation -> List DataModelWithMutations
+fillDataModelsWithMutations dataModels mutations =
+    List.map
+        (\dataModel ->
+            { name = dataModel.name
+            , fields = dataModel.fields
+            , mutations = List.filter (\mutation -> String.endsWith dataModel.name mutation.name) mutations
+            }
+        )
+        dataModels
+
+fillModelTablesWithMutations : List ModelTable -> List Mutation -> List ModelTable
+fillModelTablesWithMutations modelTables mutations =
+    List.map
+        (\modelTable ->
+            { name = modelTable.name
+            , fields = modelTable.fields
+            , mutations = List.filter (\mutation -> String.endsWith modelTable.name mutation.name) mutations
+            }
+        )
+        modelTables
 introspectionDataDecoder : D.Decoder IntrospectionData
 introspectionDataDecoder =
     D.succeed IntrospectionData
         |> requiredAt [ "data", "__schema", "types" ] (D.list dataModelDecoder)
-        |> requiredAt [ "data", "__schema", "mutationType" ] (D.list dataModelDecoder)
+        |> requiredAt [ "data", "__schema", "mutationType" ] (D.list mutationDecoder)
 
 
 dataModelDecoder : D.Decoder DataModel
@@ -150,6 +575,27 @@ ofTypeDecoder =
     D.succeed OfType
         |> required "name" (D.maybe D.string)
         |> required "kind" D.string
+
+
+mutationDecoder : D.Decoder Mutation
+mutationDecoder =
+    D.succeed Mutation
+        |> required "name" D.string
+        |> required "fields" (D.list mutationFieldDecoder)
+
+
+mutationFieldDecoder : D.Decoder MutationField
+mutationFieldDecoder =
+    D.succeed MutationField
+        |> required "name" D.string
+        |> required "args" (D.list mutationArgumentDecoder)
+
+
+mutationArgumentDecoder : D.Decoder MutationArgument
+mutationArgumentDecoder =
+    D.succeed MutationArgument
+        |> required "name" D.string
+        |> required "type" typeDecoder
 
 
 type alias Model =
@@ -220,7 +666,7 @@ update msg model =
                     in
                     ( { model
                         | introspectionData = introspectionData
-                        , filteredIntrospectionData = getDataModelsWithFields introspectionData.types newDataModels
+                        , filteredIntrospectionData = getDataModelsWithFields introspectionData.types newDataModels 
                       }
                     , Cmd.none
                     )
@@ -358,7 +804,7 @@ updateModelTable : List ModelTable -> ModelTable -> ModelTable -> List ModelTabl
 updateModelTable modelTables modelTable newModelTable =
     List.map
         (\modelTable_ ->
-            if modelTable_.dataModel.name == modelTable.dataModel.name then
+            if modelTable_.dataModelWithMutations.name == modelTable.dataModelWithMutations.name then
                 newModelTable
 
             else
@@ -367,18 +813,12 @@ updateModelTable modelTables modelTable newModelTable =
         modelTables
 
 
-
--- modelTable.dataModel.fields.maybe.map { |e| "#{data[e]} == filter" }.join(" && ")
-
-
-{-| Fetch data from the server
--}
 graphQlDataQuery : Maybe String -> ModelTable -> Value
 graphQlDataQuery maybeFilter modelTable =
     Encode.string
         ("""query { """
             ++ "paginated"
-            ++ pluralize modelTable.dataModel.name
+            ++ pluralize modelTable.dataModelWithMutations.name
             ++ "("
             ++ (case maybeFilter of
                     Nothing ->
@@ -389,7 +829,7 @@ graphQlDataQuery maybeFilter modelTable =
 
                     Just filter ->
                         "filter: "
-                            ++ filtersToGraphQlString filter modelTable.dataModel.fields
+                            ++ filtersToGraphQlString filter modelTable.dataModelWithMutations.fields
                             ++ ", "
                )
             ++ "page: "
@@ -402,7 +842,7 @@ graphQlDataQuery maybeFilter modelTable =
             ++ orderDirectionToString modelTable.orderDirection
             ++ "\""
             ++ ") { totalCount data { "
-            ++ String.join " " (List.map .name modelTable.dataModel.fields)
+            ++ String.join " " (List.map .name modelTable.dataModelWithMutations.fields)
             ++ " } } }"
         )
 
@@ -447,7 +887,7 @@ fetchData maybeFilter modelTable =
                     , ( "variables", graphQlVariables )
                     ]
                 )
-        , expect = Http.expectJson (GotDataResponse modelTable) (dataDecoder modelTable.dataModel)
+        , expect = Http.expectJson (GotDataResponse modelTable) (dataDecoder modelTable.dataModelWithMutations)
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -458,7 +898,7 @@ dataRowDecoder =
     D.keyValuePairs (D.maybe D.string) |> D.map (List.map (\( key, value ) -> { key = key, value = value }))
 
 
-dataDecoder : DataModel -> D.Decoder Data
+dataDecoder : DataModelWithMutations -> D.Decoder Data
 dataDecoder dataModel =
     D.succeed Data
         |> requiredAt [ "data", "paginated" ++ pluralize dataModel.name, "totalCount" ] D.int
@@ -540,7 +980,7 @@ displayTable modelTable =
                     , view = displayData field
                     }
                 )
-                modelTable.dataModel.fields
+                modelTable.dataModelWithMutations.fields
         }
 
 
@@ -673,7 +1113,7 @@ displayFieldName modelTable =
         , pointer
         , onClick (OpenType modelTable)
         ]
-        [ Element.text modelTable.dataModel.name
+        [ Element.text modelTable.dataModelWithMutations.name
         ]
 
 
@@ -682,7 +1122,7 @@ type alias ModelTable =
     , perPage : Int
     , orderBy : String
     , orderDirection : OrderDirection
-    , dataModel : DataModel
+    , dataModelWithMutations : DataModelWithMutations
     , data : Data
     }
 
@@ -708,7 +1148,7 @@ emptyModelTable dataModel =
     , perPage = 25
     , orderBy = "createdAt"
     , orderDirection = Desc
-    , dataModel = dataModel
+    , dataModelWithMutations = DataModelWithMutations dataModel.name dataModel.fields []
     , data = Data 0 []
     }
 
