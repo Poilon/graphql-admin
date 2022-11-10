@@ -7,6 +7,8 @@ import Element.Border as Border
 import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input
+import FontAwesome as FA
+import FontAwesome.Solid as FA
 import Html exposing (Html, option, select)
 import Html.Attributes
 import Html.Events
@@ -14,6 +16,7 @@ import Http exposing (Error)
 import Json.Decode as D
 import Json.Decode.Pipeline as D exposing (required, requiredAt)
 import Json.Encode as Encode exposing (Value)
+import Palette.Utils exposing (displayIcon)
 import String.Case as String exposing (toCamelCaseLower)
 import Url
 
@@ -234,8 +237,11 @@ type Msg
     | SearchInputChanged String
     | UpdatePerPage String
     | OrderBy String
+    | DataCellChanged String String String
     | Destroy Mutation Id DataModelWithMutations
     | GotMutationResponse Id (Result Error DataRow)
+    | Update Mutation Id DataRow DataModelWithMutations
+    | GotUpdateResponse Id (Result Error DataRow)
 
 
 type Id
@@ -407,7 +413,7 @@ update msg model =
                     ( model, Cmd.none )
 
         Destroy mutation id dataName ->
-            ( model, destroy mutation id dataName )
+            ( model, callDestroyMutation mutation id dataName )
 
         GotMutationResponse id (Ok _) ->
             ( model
@@ -422,31 +428,77 @@ update msg model =
         GotMutationResponse id (Err err) ->
             ( { model | error = Just (toString err) }, Cmd.none )
 
+        Update mutation id dataRow dataName ->
+            ( model, callUpdateMutation mutation id dataRow dataName )
 
+        GotUpdateResponse id (Ok _) ->
+            ( model
+            , case model.typeOpened of
+                Just modelTable ->
+                    fetchData (Just model.searchInput) modelTable
 
--- type alias Mutation =
---     { name : String, args : List MutationArgument }
--- type alias Type =
---     { name : Maybe String, kind : String, ofType : Maybe OfType }
--- type alias OfType =
---     { name : Maybe String, kind : String }
--- {
---     "name": "destroyWorkspace", -- here Workspace is the name of the model
---     "args": [
---         {
---         "name": "id",
---         "type": {
---             "name": null,
---             "kind": "NON_NULL",
---             "ofType": {
---             "name": "String",
---             "kind": "SCALAR"
---             }
---         }
---         }
---     ]
--- },
--- here, we know that the mutation is a destroy mutation and that it takes only one argument, the id of the model to destroy
+                Nothing ->
+                    Cmd.none
+            )
+
+        GotUpdateResponse id (Err err) ->
+            ( { model | error = Just (toString err) }, Cmd.none )
+
+        -- type alias Data =
+        --     { totalCount : Int
+        --     , dataList : List DataRow
+        --     }
+        -- type alias DataRow =
+        --     { row : List { key : String, value : Maybe String } }
+        -- type alias DataModelWithMutations =
+        --     { name : String, fields : List Field, mutations : List Mutation }
+        DataCellChanged dataModelName fieldName newValue ->
+            case model.typeOpened of
+                Just modelTable ->
+                    let
+                        data =
+                            modelTable.data
+
+                        dataList =
+                            modelTable.data.dataList
+
+                        dataListWithNewValue =
+                            List.map
+                                (\dataRow ->
+                                    let
+                                        row =
+                                            dataRow.row
+
+                                        rowWithNewValue =
+                                            List.map
+                                                (\field ->
+                                                    if field.key == fieldName then
+                                                        { field | value = Just newValue }
+
+                                                    else
+                                                        field
+                                                )
+                                                row
+                                    in
+                                    { dataRow | row = rowWithNewValue }
+                                )
+                                dataList
+
+                        newData =
+                            { data | dataList = dataListWithNewValue }
+
+                        newModelTable =
+                            { modelTable | data = newData }
+                    in
+                    ( { model
+                        | filteredIntrospectionData = updateModelTable model.filteredIntrospectionData modelTable newModelTable
+                        , typeOpened = Just newModelTable
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
 
 encodeFields : List Field -> String
@@ -456,8 +508,8 @@ encodeFields fields =
         |> String.join " "
 
 
-destroy : Mutation -> Id -> DataModelWithMutations -> Cmd Msg
-destroy mutation id dataModel =
+callDestroyMutation : Mutation -> Id -> DataModelWithMutations -> Cmd Msg
+callDestroyMutation mutation id dataModel =
     case List.head mutation.args of
         Just mutationArgument ->
             if mutationArgument.name == "id" && mutationArgument.type_.kind == "NON_NULL" then
@@ -498,29 +550,127 @@ destroy mutation id dataModel =
             Debug.todo "mutation has no argument"
 
 
+callUpdateMutation : Mutation -> Id -> DataRow -> DataModelWithMutations -> Cmd Msg
+callUpdateMutation mutation id dataRow dataModel =
+    case List.head (Debug.log "mutationsArgs" mutation.args) of
+        Just mutationArgument ->
+            if mutationArgument.name == "id" && mutationArgument.type_.kind == "NON_NULL" then
+                Http.request
+                    { method = "POST"
+                    , headers = [ Http.header "Content-Type" "application/json" ]
+                    , url = "http://localhost:3000/graphql"
+                    , body =
+                        Http.jsonBody
+                            (Encode.object
+                                [ ( "query"
+                                  , Encode.string
+                                        ("mutation { "
+                                            ++ mutation.name
+                                            ++ "(id: \""
+                                            ++ idToString id
+                                            ++ "\", "
+                                            ++ "attributes: { "
+                                            ++ encodeDataRow dataRow.row dataModel.fields
+                                            ++ " }) { "
+                                            ++ String.toCamelCaseLower dataModel.name
+                                            ++ " { "
+                                            ++ encodeFields dataModel.fields
+                                            ++ " } } }"
+                                        )
+                                  )
+                                , ( "variables", graphQlVariables )
+                                ]
+                            )
+                    , expect = Http.expectJson (GotUpdateResponse id) (dataModelFromMutationDecoder mutation dataModel.name)
+                    , timeout = Nothing
+                    , tracker = Nothing
+                    }
 
--- type alias DataRow =
---     List { key : String, value : Maybe String }
---
---
---
--- {
---         "data": {
---             "destroyFolder": {
---                 "folder": {
---                     "createdAt": "2022-11-09 17:24:33 UTC",
---                     "customerId": "3cca2b6c-d6c7-4da0-9182-5f780d0be7f7",
---                     "endDate": "2022-12-28 00:00:00 UTC",
---                     "id": "805da441-672b-4f41-aca3-8425def365ec",
---                     "name": "123",
---                     "startDate": "2022-11-23 00:00:00 UTC",
---                     "updatedAt": "2022-11-09 17:24:33 UTC",
---                     "userId": "854b1efb-faaf-47ca-9abf-b1563eec71d3",
---                     "workspaceId": "a03dcef1-1364-413e-bba9-f6e4d6c147e7"
---                 }
---             }
---         }
---     }
+            else
+                Debug.todo "mutation argument is not an id"
+
+        Nothing ->
+            Debug.todo "mutation has no argument"
+
+
+encodeDataRow : List { key : String, value : Maybe String } -> List Field -> String
+encodeDataRow row fields =
+    row
+        |> List.map
+            (\field ->
+                case field.value of
+                    Just value ->
+                        field.key ++ ": " ++ encodeValue value (getFieldType field.key fields)
+
+                    Nothing ->
+                        Debug.todo "field value is Nothing"
+            )
+        |> String.join ", "
+
+
+getFieldType : String -> List Field -> Type
+getFieldType fieldName fields =
+    case List.filter (\field -> field.name == fieldName) fields of
+        field :: _ ->
+            field.type_
+
+        [] ->
+            Debug.todo "field not found"
+
+
+
+-- type alias Type =
+--     { name : Maybe String, kind : String, ofType : Maybe OfType }
+
+
+encodeValue : String -> { name : Maybe String, kind : String, ofType : Maybe OfType } -> String
+encodeValue value { name, kind, ofType } =
+    case ( name, kind, ofType ) of
+        ( Just "Int", _, _ ) ->
+            value
+
+        ( Just "Float", _, _ ) ->
+            value
+
+        ( Just "String", _, _ ) ->
+            "\"" ++ value ++ "\""
+
+        ( Just "Boolean", _, _ ) ->
+            value
+
+        ( Just "ID", _, _ ) ->
+            "\"" ++ value ++ "\""
+
+        ( _, "NON_NULL", Just ofType_ ) ->
+            encodeValueByOfType value ofType_
+
+        ( _, "LIST", Just ofType_ ) ->
+            "[" ++ encodeValueByOfType value ofType_ ++ "]"
+
+        _ ->
+            Debug.todo "encodeValue: unknown type"
+
+
+encodeValueByOfType : String -> { name : Maybe String, kind : String } -> String
+encodeValueByOfType value { name, kind } =
+    case ( name, kind ) of
+        ( Just "Int", _ ) ->
+            value
+
+        ( Just "Float", _ ) ->
+            value
+
+        ( Just "String", _ ) ->
+            "\"" ++ value ++ "\""
+
+        ( Just "Boolean", _ ) ->
+            value
+
+        ( Just "ID", _ ) ->
+            "\"" ++ value ++ "\""
+
+        _ ->
+            Debug.todo "encodeValueByOfType: unknown type"
 
 
 dataModelFromMutationDecoder : Mutation -> String -> D.Decoder DataRow
@@ -709,7 +859,6 @@ displayTable modelTable =
 
         mutationsWithoutCreateAndUpdate =
             modelTable.dataModelWithMutations.mutations
-                |> List.filter (\mutation -> mutation.name /= "create" ++ modelTable.dataModelWithMutations.name && mutation.name /= "update" ++ modelTable.dataModelWithMutations.name)
                 |> List.map MutationField
     in
     Element.table [ width fill, height fill ]
@@ -732,7 +881,7 @@ displayTable modelTable =
                                     , maybeShowCaret modelTable field.name
                                     ]
                             , width = fill
-                            , view = displayData field
+                            , view = displayData field modelTable.dataModelWithMutations.name
                             }
 
                         MutationField mutation ->
@@ -774,9 +923,21 @@ displayMutation dataModel mutation dataRow =
             case id of
                 Just id_ ->
                     Input.button
+                        [ height fill ]
+                        { label = displayIcon FA.trash
+                        , onPress = Just <| Destroy mutation id_ dataModel
+                        }
+
+                Nothing ->
+                    none
+
+        "update" ->
+            case id of
+                Just id_ ->
+                    Input.button
                         []
                         { label = text mutation.name
-                        , onPress = Just <| Destroy mutation id_ dataModel
+                        , onPress = Just <| Update mutation id_ dataRow dataModel
                         }
 
                 Nothing ->
@@ -799,21 +960,33 @@ maybeShowCaret modelTable fieldName =
         none
 
 
-displayData : Field -> DataRow -> Element Msg
-displayData field data =
+
+-- Input.text :
+--     List (Attribute msg)
+--     ->
+--         { onChange : String -> msg
+--         , text : String
+--         , placeholder : Maybe (Placeholder msg)
+--         , label : Label msg
+--         }
+--     -> Element msg
+
+
+displayData : Field -> String -> DataRow -> Element Msg
+displayData field dataModelName data =
     el [ Border.solid, Border.width 1, Font.center ] <|
-        text <|
-            case data.row |> List.filter (\d -> d.key == field.name) |> List.head of
-                Just d ->
-                    case d.value of
-                        Just value ->
-                            value
+        case data.row |> List.filter (\d -> d.key == field.name) |> List.head of
+            Just d ->
+                Input.text
+                    [ width fill, height fill ]
+                    { onChange = DataCellChanged dataModelName field.name
+                    , text = Maybe.withDefault "null" d.value
+                    , placeholder = Nothing
+                    , label = Input.labelHidden (dataModelName ++ " " ++ field.name)
+                    }
 
-                        Nothing ->
-                            "null"
-
-                Nothing ->
-                    "null"
+            Nothing ->
+                none
 
 
 graphQLTable : Model -> Element Msg
